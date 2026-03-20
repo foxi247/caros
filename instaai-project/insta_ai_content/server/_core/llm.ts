@@ -1,36 +1,52 @@
 import axios from "axios";
 
+// ─── NVIDIA API (OpenAI-compatible) ──────────────────────────────────────────
+//
+// Model: meta/llama-3.3-70b-instruct
+// Endpoint: https://integrate.api.nvidia.com/v1
+//
+const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1";
+const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
+
 type LLMMessage = { role: "system" | "user" | "assistant"; content: string };
 
 type LLMOptions = {
   messages: LLMMessage[];
-  model?: string;
   temperature?: number;
+  topP?: number;
   maxTokens?: number;
+  stream?: boolean;
 };
 
 export async function invokeLLM(options: LLMOptions): Promise<string> {
-  const apiKey = process.env.BUILT_IN_FORGE_API_KEY;
-  const apiUrl = process.env.BUILT_IN_FORGE_API_URL || "https://api.openai.com/v1";
+  const apiKey = process.env.NVIDIA_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(
+      "NVIDIA_API_KEY is not set. Add it to your .env file."
+    );
+  }
 
   const response = await axios.post(
-    `${apiUrl}/chat/completions`,
+    `${NVIDIA_BASE_URL}/chat/completions`,
     {
-      model: options.model || "gpt-4o",
+      model: NVIDIA_MODEL,
       messages: options.messages,
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 4000,
+      temperature: options.temperature ?? 0.2,
+      top_p: options.topP ?? 0.7,
+      max_tokens: options.maxTokens ?? 1024,
+      stream: false,
     },
     {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      timeout: 30000,
+      timeout: 60_000,
     }
   );
 
-  return response.data.choices[0].message.content;
+  return response.data.choices[0].message.content as string;
 }
 
 // ─── Carousel Generation ──────────────────────────────────────────────────────
@@ -62,44 +78,57 @@ export async function generateCarouselContent(
 ): Promise<GeneratedCarousel> {
   const systemPrompt = `You are a professional Instagram carousel content creator.
 Create engaging, viral-worthy carousel posts with 5-8 slides.
-Always respond with valid JSON only, no markdown code blocks.
+IMPORTANT: Respond with valid JSON ONLY. No markdown, no code blocks, no explanation.
 The JSON must match this exact structure:
 {
   "title": "carousel title",
-  "caption": "instagram caption with hashtags (1000-1500 chars)",
+  "caption": "instagram caption with hashtags (800-1200 chars)",
   "slides": [
     {
       "slideNumber": 1,
-      "heading": "slide heading",
-      "content": "slide text content",
-      "visualDescription": "description for visual design",
+      "heading": "short slide heading",
+      "content": "slide body text (2-4 sentences)",
+      "visualDescription": "brief visual design note",
       "colorScheme": "primary: #hex, secondary: #hex, text: #hex",
       "textAlignment": "center"
     }
   ]
 }`;
 
-  const userPrompt = `Create an Instagram carousel for:
+  const userPrompt = `Create an Instagram carousel post for:
 - Niche/Topic: ${input.niche}
 - Tone of voice: ${input.tone}
 - Language: ${input.language}
 - Target audience: ${input.targetAudience}
 
-Generate 6-8 engaging slides. Make them visually descriptive and compelling.`;
+Generate 6 engaging slides. Return ONLY the JSON object.`;
 
   const raw = await invokeLLM({
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    temperature: 0.8,
-    maxTokens: 4000,
+    temperature: 0.2,
+    topP: 0.7,
+    maxTokens: 2048,
   });
 
+  // Strip any accidental markdown fences
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
   try {
-    const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     return JSON.parse(cleaned) as GeneratedCarousel;
   } catch {
-    throw new Error("AI returned invalid JSON. Please try again.");
+    // Try to extract JSON object from the response
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]) as GeneratedCarousel;
+    }
+    throw new Error(
+      "AI returned invalid JSON. Please try again."
+    );
   }
 }

@@ -1,53 +1,47 @@
 import { relations, sql } from "drizzle-orm";
 import {
-  boolean,
-  datetime,
-  int,
-  mysqlTable,
+  integer,
+  pgTable,
+  serial,
   text,
+  timestamp,
   varchar,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
 
 // ─── Users ──────────────────────────────────────────────────────────────────
 
-export const users = mysqlTable("users", {
-  id: int("id").primaryKey().autoincrement(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   role: varchar("role", { length: 50 }).notNull().default("user"),
-  createdAt: datetime("created_at")
-    .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: datetime("updated_at")
-    .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ─── Instagram Accounts ───────────────────────────────────────────────────────
 
-export const instagramAccounts = mysqlTable("instagram_accounts", {
-  id: int("id").primaryKey().autoincrement(),
-  userId: int("user_id")
+export const instagramAccounts = pgTable("instagram_accounts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
     .notNull()
     .references(() => users.id),
   instagramUserId: varchar("instagram_user_id", { length: 255 }).notNull(),
   username: varchar("username", { length: 255 }).notNull(),
   accessToken: text("access_token").notNull(),
-  tokenExpiresAt: datetime("token_expires_at"),
-  connectedAt: datetime("connected_at")
-    .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  connectedAt: timestamp("connected_at").notNull().defaultNow(),
 });
 
 // ─── Carousel Posts ───────────────────────────────────────────────────────────
 
-export const carouselPosts = mysqlTable("carousel_posts", {
-  id: int("id").primaryKey().autoincrement(),
-  userId: int("user_id")
+export const carouselPosts = pgTable("carousel_posts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
     .notNull()
     .references(() => users.id),
-  instagramAccountId: int("instagram_account_id").references(
+  instagramAccountId: integer("instagram_account_id").references(
     () => instagramAccounts.id
   ),
   title: varchar("title", { length: 500 }).notNull(),
@@ -58,20 +52,18 @@ export const carouselPosts = mysqlTable("carousel_posts", {
   targetAudience: varchar("target_audience", { length: 255 }),
   status: varchar("status", { length: 50 }).notNull().default("draft"),
   instagramMediaId: varchar("instagram_media_id", { length: 255 }),
-  publishedAt: datetime("published_at"),
-  createdAt: datetime("created_at")
-    .notNull()
-    .default(sql`CURRENT_TIMESTAMP`),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Carousel Slides ──────────────────────────────────────────────────────────
 
-export const carouselSlides = mysqlTable("carousel_slides", {
-  id: int("id").primaryKey().autoincrement(),
-  postId: int("post_id")
+export const carouselSlides = pgTable("carousel_slides", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id")
     .notNull()
     .references(() => carouselPosts.id),
-  slideNumber: int("slide_number").notNull(),
+  slideNumber: integer("slide_number").notNull(),
   heading: varchar("heading", { length: 500 }),
   content: text("content"),
   visualDescription: text("visual_description"),
