@@ -5,7 +5,6 @@
   "installCommand": "npm install --legacy-peer-deps",
   "functions": {
     "api/index.ts": {
-      "runtime": "@vercel/node@3",
       "maxDuration": 60
     }
   },
