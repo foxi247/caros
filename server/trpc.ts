@@ -49,7 +49,18 @@ export async function createContext({
   return { req, res, user };
 }
 
-const t = initTRPC.context<Context>().create({ transformer: superjson });
+const t = initTRPC.context<Context>().create({
+  transformer: superjson,
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      message:
+        error.cause instanceof Error
+          ? error.cause.message
+          : shape.message,
+    };
+  },
+});
 
 export const router = t.router;
 export const publicProcedure = t.procedure;
